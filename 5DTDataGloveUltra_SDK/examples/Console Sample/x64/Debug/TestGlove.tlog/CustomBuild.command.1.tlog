@@ -1,0 +1,3 @@
+^C:\USERS\DUDAT\ONEDRIVE\DOCUMENTOS\CIENCIADACOMPUTACAO\BRAIN\5DTDATAGLOVEULTRA_SDK\FGLOVE64.DLL
+mkdir Debug
+copy "C:\Users\dudat\OneDrive\Documentos\CienciaDaComputacao\brain\5DTDataGloveUltra_SDK\fglove64.dll" "C:\Users\dudat\OneDrive\Documentos\CienciaDaComputacao\brain\5DTDataGloveUltra_SDK\examples\Console Sample\bin\x64\Debug\"

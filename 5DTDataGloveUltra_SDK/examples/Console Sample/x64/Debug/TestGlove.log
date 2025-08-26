@@ -1,0 +1,9 @@
+﻿  copy C:\Users\dudat\OneDrive\Documentos\CienciaDaComputacao\brain\5DTDataGloveUltra_SDK\fglove64.dll C:\Users\dudat\OneDrive\Documentos\CienciaDaComputacao\brain\5DTDataGloveUltra_SDK\examples\Console Sample\bin\x64\Debug\
+  Já existe uma subpasta ou um arquivo Debug.
+          1 arquivo(s) copiado(s).
+C:\Program Files\Microsoft Visual Studio\2022\Community\MSBuild\Microsoft\VC\v170\Microsoft.CppCommon.targets(254,5): warning MSB8065: o build personalizado do item "..\..\fglove64.dll" foi bem-sucedido, mas a saída especificada "c:\fglove64.dll" não foi criada. Isso pode causar o funcionamento incorreto do build incremental.
+  testglove.cpp
+C:\Users\dudat\OneDrive\Documentos\CienciaDaComputacao\brain\5DTDataGloveUltra_SDK\examples\Console Sample\testglove.cpp(54,9): warning C4996: 'strcpy': This function or variable may be unsafe. Consider using strcpy_s instead. To disable deprecation, use _CRT_SECURE_NO_WARNINGS. See online help for details.
+C:\Users\dudat\OneDrive\Documentos\CienciaDaComputacao\brain\5DTDataGloveUltra_SDK\examples\Console Sample\testglove.cpp(58,9): warning C4996: 'strncpy': This function or variable may be unsafe. Consider using strncpy_s instead. To disable deprecation, use _CRT_SECURE_NO_WARNINGS. See online help for details.
+C:\Users\dudat\OneDrive\Documentos\CienciaDaComputacao\brain\5DTDataGloveUltra_SDK\examples\Console Sample\testglove.cpp(43,9): warning C4101: 'i': variável local não referenciada
+  TestGlove.vcxproj -> C:\Users\dudat\OneDrive\Documentos\CienciaDaComputacao\brain\5DTDataGloveUltra_SDK\examples\Console Sample\bin\x64\Debug\TestGlove64.exe
