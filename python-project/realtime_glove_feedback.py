@@ -10,7 +10,7 @@ import os
 
 PATH_TO_C_EXE = "./TestGlove64.exe" 
 GLOVE_CONNECTION_PORT = "USB0" 
-IMAGES_FOLDER = "gesture_images" 
+IMAGES_FOLDER = "../gesture-images" 
 
 IMAGE_MAP = {
     0: "0.png",
