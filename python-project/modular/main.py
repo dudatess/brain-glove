@@ -1,19 +1,27 @@
 # main.py
-
-import os
 import tkinter as tk
 from gui.clinical_glove_app import ClinicalGloveApp
-from core.constants import IMAGES_FOLDER
 
-# ============================================================
-# PONTO DE ENTRADA
-# ============================================================
 if __name__ == "__main__":
-    if not os.path.exists(IMAGES_FOLDER):
-        print(f"AVISO: A pasta '{IMAGES_FOLDER}' não foi encontrada.")
-        print("O sistema funcionará, mas sem imagens de gestos.")
-
     root = tk.Tk()
+    root.title("Luva 5DT - Sistema de Neuroreabilitação")
+
+    # 🔹 Ajusta automaticamente à resolução da tela
+    screen_width = root.winfo_screenwidth()
+    screen_height = root.winfo_screenheight()
+
+    # Margem opcional (10% menor que o total da tela)
+    app_width = int(screen_width * 0.9)
+    app_height = int(screen_height * 0.9)
+
+    # Centraliza a janela
+    x = (screen_width // 2) - (app_width // 2)
+    y = (screen_height // 2) - (app_height // 2)
+
+    root.geometry(f"{app_width}x{app_height}+{x}+{y}")
+
+    # Impede redimensionamento manual se quiser manter layout fixo
+    root.minsize(800, 600)
+
     app = ClinicalGloveApp(root)
     root.mainloop()
-
