@@ -2,21 +2,18 @@ import tkinter as tk
 from tkinter import ttk
 
 class SensorList(tk.Frame):
-    """
-    Exibe a lista de sensores com valores e estado visual.
-    Pode ser atualizada dinamicamente a partir do loop de dados.
-    """
 
-    def __init__(self, master, sensor_names, bg="#ffffff"):
+    def __init__(self, master, sensor_names, max_value=1.0, bg="#ffffff"):
         super().__init__(master, bg=bg)
         self.sensor_names = sensor_names
+        self.max_value = max_value
         self.bg = bg
-        self.labels = []
-        self.state_labels = []
+        self.rows = []
 
-        # Canvas rolável
+        # Área com scroll
         self.canvas = tk.Canvas(self, bg=bg, highlightthickness=0)
-        self.scrollbar = ttk.Scrollbar(self, orient='vertical', command=self.canvas.yview)
+        self.scrollbar = ttk.Scrollbar(self, orient='vertical',
+                                       command=self.canvas.yview)
         self.inner = tk.Frame(self.canvas, bg=bg)
 
         self.canvas.create_window((0, 0), window=self.inner, anchor='nw')
@@ -25,45 +22,89 @@ class SensorList(tk.Frame):
         self.canvas.pack(side='left', fill='both', expand=True)
         self.scrollbar.pack(side='right', fill='y')
 
-        self._build_sensor_rows()
+        self._build_rows()
+        self._update_scroll_region()
+
+    # -----------------------------------------------------------
+    def _update_scroll_region(self):
+        """Atualiza região do scroll sempre que necessário."""
         self.inner.update_idletasks()
         self.canvas.configure(scrollregion=self.canvas.bbox('all'))
 
-    def _build_sensor_rows(self):
-        for i, name in enumerate(self.sensor_names):
-            frame = tk.Frame(self.inner, bg=self.bg)
-            frame.pack(fill='x', pady=2, padx=4)
+    # -----------------------------------------------------------
+    def _build_rows(self):
+        BAR_W = 160
+        BAR_H = 12
 
-            label = tk.Label(frame, text=f"{name}: -", font=("Courier", 10),
-                             bg=self.bg, anchor='w', width=40)
-            label.pack(side='left')
+        for name in self.sensor_names:
+            row_frame = tk.Frame(self.inner, bg=self.bg)
+            row_frame.pack(fill='x', pady=4, padx=4)
 
-            state_label = tk.Label(frame, text="⚪", font=("Helvetica", 12),
-                                   bg=self.bg, width=3)
-            state_label.pack(side='left', padx=4)
+            # Nome
+            lbl = tk.Label(row_frame, text=name, width=12,
+                           anchor='w', bg=self.bg)
+            lbl.pack(side='left')
 
-            self.labels.append(label)
-            self.state_labels.append(state_label)
+            # Barra horizontal
+            bar_canvas = tk.Canvas(row_frame, width=BAR_W, height=BAR_H,
+                                   bg="#e6e6e6", highlightthickness=0)
+            bar_canvas.pack(side='left', padx=6)
+            bar_rect = bar_canvas.create_rectangle(0, 0, 1, BAR_H,
+                                                   fill="#67a6f7", width=0)
 
+            # Valor numérico
+            val_lbl = tk.Label(row_frame, text="0.000", width=6, bg=self.bg)
+            val_lbl.pack(side='left', padx=6)
+
+            # Status
+            status_lbl = tk.Label(row_frame, text="⚪", width=3, bg=self.bg)
+            status_lbl.pack(side='left')
+
+            self.rows.append({
+                "frame": row_frame,
+                "label": lbl,
+                "bar": bar_canvas,
+                "bar_rect": bar_rect,
+                "value": val_lbl,
+                "status": status_lbl
+            })
+
+    # -----------------------------------------------------------
     def update_values(self, values, thresholds=None, active_mask=None):
         """
-        Atualiza os valores e o estado visual dos sensores.
-        thresholds: lista de limites para indicar 'aberto' (🟢) ou 'fechado' (🔴)
-        active_mask: lista booleana indicando sensores ativos (True) ou desativados (False)
+        values: lista de valores dos sensores
+        thresholds: lista opcional do mesmo tamanho
+        active_mask: lista de booleans para ativar/desativar sensores
         """
-        for i, (label, state_label) in enumerate(zip(self.labels, self.state_labels)):
+        BAR_W = 160
+
+        for i, row in enumerate(self.rows):
             if i >= len(values):
                 continue
 
-            val = values[i]
-            label.config(text=f"{self.sensor_names[i]}: {val:.3f}")
+            v = float(values[i])
+            row["value"].config(text=f"{v:.3f}")
 
-            # Define cor do estado
+            # Redimensionamento da barra
+            bar_canvas = row["bar"]
+            rect = row["bar_rect"]
+            fill_w = max(1, min(BAR_W, int((v / self.max_value) * BAR_W)))
+
+            # Lógica de cor / status
+            color = "#67a6f7"   # Normal azul
+
             if active_mask and not active_mask[i]:
-                state_label.config(text="◼️")  # desativado
-            elif thresholds and val >= thresholds[i]:
-                state_label.config(text="🔴")
-            elif thresholds:
-                state_label.config(text="🟢")
+                color = "#888888"   # Cinza — desativado
+                row["status"].config(text="◼️")
+
+            elif thresholds and v >= thresholds[i]:
+                color = "#ff5b5b"   # Vermelho — acima do limite
+                row["status"].config(text="🔴")
+
             else:
-                state_label.config(text="⚪")
+                row["status"].config(text="🟢" if thresholds else "⚪")
+
+            bar_canvas.coords(rect, 0, 0, fill_w, 12)
+            bar_canvas.itemconfig(rect, fill=color)
+
+        self._update_scroll_region()

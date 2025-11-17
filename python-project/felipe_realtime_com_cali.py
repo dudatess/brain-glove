@@ -759,25 +759,74 @@ Você pode escolher quantos ciclos deseja executar e excluir sensores da calibra
     # Gerenciamento da conexão com o executável
     # -------------------------
     def start_connection(self):
-        # tenta iniciar a thread de leitura apenas se não estiver rodando
-        if not self.c_thread or not self.c_thread.is_alive():
-            # só inicia se o executável existir; caso contrário, apenas mostra erro no check_status
+
+        print("\n========================")
+        print(" [ClinicalGloveApp] Iniciando conexão com a luva…")
+        print("========================")
+
+        # 1 — Mostra a porta configurada
+        print(f"[ClinicalGloveApp] Porta configurada: {GLOVE_CONNECTION_PORT}")
+        print("[ClinicalGloveApp] Testando porta informada…")
+
+        try:
+            test = subprocess.run(
+                [PATH_TO_C_EXE, GLOVE_CONNECTION_PORT],
+                capture_output=True,
+                text=True,
+                timeout=2
+            )
+
+            print("[TEST STDOUT]")
+            print(test.stdout.strip())
+            print("[TEST STDERR]")
+            print(test.stderr.strip())
+
+            if "falhou" in test.stdout.lower() or "error" in test.stdout.lower():
+                print("\n[ERRO] O executável NÃO conseguiu abrir essa porta!")
+                print("Conexão cancelada.\n")
+                return
+
+        except subprocess.TimeoutExpired:
+            print("[INFO] O executável está rodando (timeout normal).")
+
+        # 3 — Verifica se o executável existe
+        if not os.path.exists(PATH_TO_C_EXE):
+            print(f"[ERRO] Executável não encontrado: {PATH_TO_C_EXE}")
+            print("       Conexão cancelada.\n")
+            return
+        else:
+            print(f"[OK] Executável encontrado: {PATH_TO_C_EXE}")
+
+        # 4 — Evita múltiplas threads
+        if self.c_thread and self.c_thread.is_alive():
+            print("[ClinicalGloveApp] A thread de comunicação já está rodando.")
+            return
+
+        print("[ClinicalGloveApp] Iniciando thread de leitura…")
+
+        # 5 — Inicia thread da luva
+        try:
             self.c_thread = threading.Thread(
                 target=read_from_glove_thread,
                 args=(self.data_queue, self.status_queue, PATH_TO_C_EXE, GLOVE_CONNECTION_PORT),
                 daemon=True
             )
-            try:
-                self.c_thread.start()
-            except Exception as e:
-                print("Falha ao iniciar thread de conexão:", e)
+            self.c_thread.start()
+            print("[OK] Thread de comunicação iniciada.\n")
+        except Exception as e:
+            print("[ERRO] Falha ao iniciar a thread de comunicação:", e)
+            print(" Conexão abortada.\n")
+
 
     def check_status(self):
         try:
             while True:
                 status = self.status_queue.get_nowait()
 
+                print(f"[ClinicalGloveApp] STATUS RECEBIDO → {status}")
+
                 if status == "connected":
+                    print("[OK] Luva conectada na porta informada.")
                     self.glove_connected = True
                     self.led_canvas.itemconfig(self.led_indicator, fill='#10b981', outline='#059669')
                     self.status_text.config(text="Conectado", fg='#10b981')
@@ -785,18 +834,22 @@ Você pode escolher quantos ciclos deseja executar e excluir sensores da calibra
                         self.start_calibration_btn.config(state='normal')
 
                 elif status == "disconnected":
+                    print("[WARN] A luva desconectou. O executável foi encerrado.")
                     self.glove_connected = False
                     self.led_canvas.itemconfig(self.led_indicator, fill='#ef4444', outline='#dc2626')
                     self.status_text.config(text="Desconectado", fg='#ef4444')
                     if hasattr(self, 'start_calibration_btn'):
                         self.start_calibration_btn.config(state='disabled')
+
                 elif status.startswith("error"):
+                    print("[ERRO] Ocorreu um erro no processo da luva!")
+                    print("      Detalhes:", status)
                     self.glove_connected = False
                     self.led_canvas.itemconfig(self.led_indicator, fill='#ef4444', outline='#dc2626')
-                    # mensagem de erro simples
                     self.status_text.config(text="Erro na conexão", fg='#ef4444')
                     if hasattr(self, 'start_calibration_btn'):
                         self.start_calibration_btn.config(state='disabled')
+
         except queue.Empty:
             pass
         finally:

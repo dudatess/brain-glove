@@ -1,6 +1,7 @@
 import tkinter as tk
 from gui.widgets.led_indicator import LEDIndicator
 
+
 class MainScreen(tk.Frame):
     """Tela inicial da aplicação."""
 
@@ -11,9 +12,11 @@ class MainScreen(tk.Frame):
         self.build_ui()
 
     def build_ui(self):
-        # Cabeçalho com o título e o indicador LED
+        # ======================================
+        # HEADER COM TÍTULO + LED
+        # ======================================
         header = tk.Frame(self, bg="#f0f4f8")
-        header.pack(fill="x", pady=(20, 10))
+        header.pack(fill="x", pady=(20, 20))
 
         title = tk.Label(
             header,
@@ -23,30 +26,72 @@ class MainScreen(tk.Frame):
         )
         title.pack(side="left", padx=40)
 
-        # LED indicador de status da luva
+        # LED Indicador
         self.led = LEDIndicator(header, status="desconectado")
         self.led.pack(side="right", padx=40)
 
-        # Mensagem de instrução
+        # ======================================
+        # MENSAGEM
+        # ======================================
         info = tk.Label(
             self,
-            text="Conecte a luva e inicie a calibração para continuar.",
-            font=("Helvetica", 12),
-            bg="#f0f4f8"
+            text="Conecte a luva e selecione uma das opções abaixo.",
+            font=("Helvetica", 13),
+            bg="#f0f4f8",
+            fg="#374151"
         )
-        info.pack(pady=10)
+        info.pack(pady=(10, 20))
 
-        # Botão de iniciar calibração
-        start_btn = tk.Button(
-            self, text="Iniciar Calibração",
+        # ======================================
+        # BOTÕES PRINCIPAIS
+        # ======================================
+        btn_frame = tk.Frame(self, bg="#f0f4f8")
+        btn_frame.pack(pady=10)
+
+        # --- BOTÃO CALIBRAÇÃO ---
+        calib_btn = tk.Button(
+            btn_frame, text="Iniciar Calibração",
             font=("Helvetica", 14, "bold"),
             bg="#3B82F6", fg="white",
-            padx=25, pady=10,
+            padx=30, pady=12,
+            width=20,
             command=self.app.show_calibration_screen
         )
-        start_btn.pack(pady=30)
+        calib_btn.grid(row=0, column=0, pady=10)
 
-        # Botão de sair
+        # --- BOTÃO FEEDBACK EM TEMPO REAL ---
+        feedback_btn = tk.Button(
+            btn_frame, text="Feedback em Tempo Real",
+            font=("Helvetica", 14, "bold"),
+            bg="#10B981", fg="white",
+            padx=30, pady=12,
+            width=20,
+            command=self.app.show_feedback_screen
+        )
+        feedback_btn.grid(row=1, column=0, pady=10)
+
+        # --- BOTÃO HISTÓRICO / RESULTADOS ---
+        history_btn = tk.Button(
+            btn_frame, text="Histórico de Sessões",
+            font=("Helvetica", 14, "bold"),
+            bg="#6366F1", fg="white",
+            padx=30, pady=12,
+            width=20,
+            command=lambda: self.app.show_results_screen(results_data=None)
+        )
+        history_btn.grid(row=2, column=0, pady=10)
+        tk.Button(
+            self,
+            text="Histórico",
+            bg="#6B7280", fg="white",
+            font=("Helvetica", 14, "bold"),
+            command=self.app.show_history_screen
+        ).pack(pady=10)
+
+
+        # ======================================
+        # BOTÃO DE SAIR
+        # ======================================
         exit_btn = tk.Button(
             self, text="Sair",
             font=("Helvetica", 12, "bold"),
@@ -54,12 +99,14 @@ class MainScreen(tk.Frame):
             padx=20, pady=8,
             command=self.app.on_close
         )
-        exit_btn.pack(pady=10)
+        exit_btn.pack(pady=20)
 
-    # Método chamado pelo app para atualizar o LED
+    # ======================================
+    # MÉTODO CHAMADO PELO APP
+    # ======================================
     def update_glove_status(self, connected: bool):
         """Atualiza o LED conforme o status da conexão."""
         if connected:
-            self.led.set_status("conectado")
+            self.led.set_state("conectado")
         else:
-            self.led.set_status("desconectado")
+            self.led.set_state("desconectado")
