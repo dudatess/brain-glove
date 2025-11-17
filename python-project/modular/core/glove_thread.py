@@ -55,35 +55,6 @@ class GloveReaderThread(threading.Thread):
         logger.setLevel(log_level)
 
         logger.info(f"Thread inicializada: porta={glove_port}, auto_reconnect={auto_reconnect}")
-        self._print_port_diagnostics(glove_port)
-
-    # =====================================================================
-    # DIAGNÓSTICOS DE PORTA
-    # =====================================================================
-    def _print_port_diagnostics(self, port: str):
-        print("\n========================")
-        print(f"[GloveThread] Porta configurada: {port}")
-
-        # Porta válida no Windows é COMx
-        if os.name == "nt":
-            if not re.fullmatch(r"COM\d+", port):
-                print("[ERRO] ESTA porta não parece válida no Windows!")
-                print("       Use algo como COM3, COM4, COM5…")
-                print("[AVISO] A luva provavelmente NÃO vai conectar.\n")
-        else:
-            # Linux: precisa ser /dev/ttyUSB0
-            if not port.startswith("/dev/"):
-                print("[ERRO] ESTA porta não parece válida no Linux!")
-                print("       Exemplo correto: /dev/ttyUSB0")
-                print("[AVISO] A luva provavelmente NÃO vai conectar.\n")
-
-        # Checar executável
-        if not os.path.exists(self.c_exe_path):
-            print(f"[ERRO] Executável não encontrado: {self.c_exe_path}")
-        else:
-            print(f"[OK] Executável encontrado: {self.c_exe_path}")
-
-        print("========================\n")
 
     # =====================================================================
     # TESTE RÁPIDO DO EXECUTÁVEL ANTES DA CONEXÃO REAL

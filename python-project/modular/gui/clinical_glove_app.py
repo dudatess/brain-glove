@@ -81,6 +81,8 @@ class ClinicalGloveApp:
         self.root.protocol("WM_DELETE_WINDOW", self.on_close)
         
         logger.info("Aplicação inicializada com sucesso")
+        print("PORT DETECTADA:", GLOVE_CONNECTION_PORT)
+
 
     # ============================================================
     # CONFIGURAÇÃO INICIAL
@@ -295,7 +297,7 @@ class ClinicalGloveApp:
 
                 if status == "connected":
                     self.glove_connected = True
-                    self._connection_attempts = 0  # Reset em caso de sucesso
+                    self._connection_attempts = 0  
                     logger.info("✓ Luva conectada")
 
                 elif status == "disconnected":
@@ -313,7 +315,8 @@ class ClinicalGloveApp:
             # Atualiza UI apenas se houve mudança de status
             if status_updated and hasattr(self.active_screen, "update_glove_status"):
                 try:
-                    self.active_screen.update_glove_status(self.glove_connected)
+                    # Passar o status original da fila
+                    self.active_screen.update_glove_status(status)
                 except Exception as e:
                     logger.error(f"Erro ao atualizar status na tela: {e}")
 
