@@ -104,6 +104,7 @@ class MainScreen(tk.Frame):
     # ======================================
     # MÉTODO CHAMADO PELO APP
     # ======================================
+<<<<<<< HEAD
     def update_glove_status(self, status: str):
         status = status.strip().lower()
 
@@ -113,6 +114,13 @@ class MainScreen(tk.Frame):
             self.led.set_state("active")
         elif status.startswith("error"):
             self.led.set_state("erro")
+=======
+    def update_glove_status(self, connected: bool):
+        """Atualiza o LED conforme o status da conexão."""
+        # usar estados compatíveis com LEDIndicator (usar "ok" para conectado)
+        if connected:
+            self.led.set_state("ok")
+>>>>>>> 49b923577e0deeb0c5c99073b8b4c341bb357f36
         else:
             self.led.set_state("desconectado")
 

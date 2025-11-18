@@ -2,6 +2,10 @@
 
 import tkinter as tk
 from tkinter import ttk, messagebox
+import json
+import os
+import datetime
+import re
 
 from core.calibration_mode import CalibrationMode
 from gui.widgets.sensor_list import SensorList
@@ -97,6 +101,15 @@ class CalibrationScreen(tk.Frame):
         self.progress = ttk.Progressbar(self, length=300, mode="determinate")
         self.progress.pack(pady=10)
 
+        # Botão: salvar sessão (abre diálogo para nome/idade)
+        save_btn = tk.Button(
+            self, text="Salvar Sessão",
+            font=("Helvetica", 11, "bold"),
+            bg="#06b6d4", fg="white",
+            padx=10, pady=6,
+            command=self.show_save_dialog
+        )
+        save_btn.pack(pady=(0, 12))
         # Botões
         btn_frame = tk.Frame(self, bg="#f0f4f8")
         btn_frame.pack(pady=10)
@@ -152,18 +165,38 @@ class CalibrationScreen(tk.Frame):
 
     # Chamado continuamente pelo app (ClinicalGloveApp.check_data)
     def process_glove_data(self, data_str):
-        """Recebe pacotes da luva e envia para o CalibrationMode."""
-        # Data string: "gesture,x1,x2,..."
+        """
+        Recebe (gesture_id, values) a partir de ClinicalGloveApp.check_data.
+        Compatível também com a versão antiga que envia string bruta.
+        """
         try:
-            parts = data_str.split(",")
-            values = [float(v) for v in parts[1:]]
-        except:
+            if isinstance(data_str, str):
+                parts = data_str.split(",")
+                vals = [float(v) for v in parts[1:]]
+            else:
+                # Esperado: (gesture_id, values)
+                _, vals = data_str
+        except Exception:
             return
 
-        self.calib.update(values)
+        # Atualiza o modo de calibração com os valores atuais
+        try:
+            self.calib.update(vals)
+        except Exception:
+            pass
 
-        # Atualizar UI com os valores atuais
-        self.sensor_list.update_values(values)
+        # Atualiza exibição dos sensores
+        thresholds = self.app.calibration_data.get("sensor_threshold")
+        active_mask = None
+        # Se o objeto de calibração expõe disabled_mask (True = desabilitado)
+        if hasattr(self.calib, "disabled_mask"):
+            active_mask = [not bool(x) for x in self.calib.disabled_mask]
+
+        try:
+            self.sensor_list.update_values(vals, thresholds=thresholds, active_mask=active_mask)
+        except Exception:
+            # Falhas na UI não devem quebrar o loop de dados
+            return
 
     # ============================================================
     # CALLBACKS DO CalibrationMode
@@ -185,6 +218,89 @@ class CalibrationScreen(tk.Frame):
         self.led.set_state("ok")
         self.app.calibration_data = results  # salvar no app
         messagebox.showinfo("Concluído", "Calibração finalizada!")
+
+    # ============================================================
+    # DIALOGO E SALVAMENTO DE SESSÃO
+    # ============================================================
+    def show_save_dialog(self):
+        """Mostra um modal para preencher nome do paciente e idade, e salva JSON."""
+        dlg = tk.Toplevel(self)
+        dlg.title("Salvar Sessão de Calibração")
+        dlg.transient(self)
+        dlg.grab_set()
+        dlg.resizable(False, False)
+
+        tk.Label(dlg, text="Nome do Paciente:", anchor="w").grid(row=0, column=0, padx=12, pady=(12, 4), sticky="w")
+        entry_name = tk.Entry(dlg, width=40)
+        entry_name.grid(row=0, column=1, padx=12, pady=(12, 4))
+
+        tk.Label(dlg, text="Idade:", anchor="w").grid(row=1, column=0, padx=12, pady=4, sticky="w")
+        entry_age = tk.Entry(dlg, width=10)
+        entry_age.grid(row=1, column=1, padx=12, pady=4, sticky="w")
+
+        tk.Label(dlg, text="Observações (opcional):", anchor="w").grid(row=2, column=0, padx=12, pady=4, sticky="nw")
+        txt_notes = tk.Text(dlg, width=40, height=5)
+        txt_notes.grid(row=2, column=1, padx=12, pady=4)
+
+        def _on_save():
+            name = entry_name.get().strip()
+            age_text = entry_age.get().strip()
+            notes = txt_notes.get("1.0", "end").strip()
+
+            if not name:
+                messagebox.showwarning("Dados incompletos", "Informe o nome do paciente.")
+                return
+
+            try:
+                age = int(age_text) if age_text else None
+            except ValueError:
+                messagebox.showwarning("Idade inválida", "Idade deve ser um número inteiro.")
+                return
+
+            # obter dados de calibração (usar compute_results se disponível)
+            try:
+                if hasattr(self.calib, "compute_results"):
+                    calib_results = self.calib.compute_results()
+                else:
+                    calib_results = dict(self.app.calibration_data)
+            except Exception:
+                calib_results = dict(self.app.calibration_data)
+
+            payload = {
+                "patient_name": name,
+                "age": age,
+                "notes": notes,
+                "timestamp": datetime.datetime.now().isoformat(),
+                "calibration": calib_results
+            }
+
+            # criar pasta data/sessions (assume cwd = project modular/)
+            sessions_dir = os.path.join(os.getcwd(), "data", "sessions")
+            os.makedirs(sessions_dir, exist_ok=True)
+
+            # arquivo: timestamp_nome.json (nome sanitizado)
+            ts = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+            safe_name = re.sub(r"[^A-Za-z0-9_-]", "_", name)[:40]
+            fname = f"{ts}_{safe_name}.json"
+            fpath = os.path.join(sessions_dir, fname)
+
+            try:
+                with open(fpath, "w", encoding="utf-8") as fh:
+                    json.dump(payload, fh, ensure_ascii=False, indent=2)
+            except Exception as e:
+                messagebox.showerror("Erro ao salvar", f"Não foi possível salvar a sessão:\n{e}")
+                return
+
+            messagebox.showinfo("Sessão salva", f"Sessão salva em:\n{fpath}")
+            dlg.destroy()
+
+        btn_frame = tk.Frame(dlg)
+        btn_frame.grid(row=3, column=0, columnspan=2, pady=(8, 12))
+        tk.Button(btn_frame, text="Cancelar", command=dlg.destroy).pack(side="right", padx=6)
+        tk.Button(btn_frame, text="Salvar", bg="#06b6d4", fg="white", command=_on_save).pack(side="right", padx=6)
+
+        entry_name.focus_set()
+        self.wait_window(dlg)
 
     # ============================================================
     # NAVEGAÇÃO

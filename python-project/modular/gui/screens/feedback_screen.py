@@ -7,6 +7,7 @@ from gui.widgets.sensor_list import SensorList
 from gui.widgets.led_indicator import LEDIndicator
 from gui.widgets.vector_viewer import VectorViewer
 from gui.widgets.frequency_plot import FrequencyPlot
+from gui.widgets.gestos_feedback import GestosFeedback
 from core.data_processing import extract_gesture_state, compute_vector, compute_frequency
 
 
@@ -43,7 +44,7 @@ class FeedbackScreen(tk.Frame):
         main.pack(expand=True, fill="both", padx=20, pady=20)
 
         # ============================================================
-        # COLUNA ESQUERDA → Vetor 2D/3D + Frequência
+        # COLUNA ESQUERDA → Gestos (imagem) + Vetor 2D/3D + Frequência
         # ============================================================
         left = tk.Frame(main, bg="white", relief="raised", borderwidth=2)
         left.pack(side="left", fill="both", expand=True, padx=(0, 10))
@@ -53,6 +54,12 @@ class FeedbackScreen(tk.Frame):
             font=("Helvetica", 15, "bold"),
             bg="white"
         ).pack(pady=5)
+
+        # Widget de gesto (imagem + label) similar ao felipe_realtime_com_cali
+        # Reutiliza imagens carregadas em ClinicalGloveApp (self.app.gesture_images)
+        imgs = getattr(self.app, "gesture_images", None)
+        self.gesto_view = GestosFeedback(left, size=320, images=imgs)
+        self.gesto_view.pack(pady=6)
 
         # Viewer do vetor (2D ou 3D dependendo da config)
         self.vector_viewer = VectorViewer(left, mode="3d")
@@ -67,13 +74,7 @@ class FeedbackScreen(tk.Frame):
         self.frequency_plot = FrequencyPlot(left)
         self.frequency_plot.pack(fill="x", padx=10, pady=10)
 
-        # Gestos
-        self.label_gesture = tk.Label(
-            left, text="Gesto: --",
-            font=("Helvetica", 14, "bold"),
-            bg="white", fg="#1a202c"
-        )
-        self.label_gesture.pack(pady=10)
+        # label_gesture é exibida pelo GestosFeedback.text_label
 
         # ============================================================
         # COLUNA DIREITA → Sensores
@@ -108,43 +109,65 @@ class FeedbackScreen(tk.Frame):
     def process_glove_data(self, raw_data):
         """
         Chamado continuamente por ClinicalGloveApp.check_data().
-        O pacote vem como string: "gesture,x1,x2,..."
+        Aceita:
+          - string antiga "gesture,x1,x2,..."  (compatibilidade)
+          - tupla (gesture_id, values)  (preferido)
+        Atualiza SensorList, visualizadores e cálculos.
         """
-
         try:
-            parts = raw_data.split(",")
-            vals = [float(v) for v in parts[1:]]
-        except:
+            if isinstance(raw_data, str):
+                parts = raw_data.split(",")
+                vals = [float(v) for v in parts[1:]]
+                gesture_id = parts[0] if parts else None
+            else:
+                gesture_id, vals = raw_data
+        except Exception:
             return
 
-        # ------------------------------------------------------------
-        # 1) Atualizar sensores
-        # ------------------------------------------------------------
+        # Atualizar widget de gesto (imagem + sensores + label) usando novo método
+        try:
+            gid = None
+            if gesture_id is not None:
+                try:
+                    gid = int(gesture_id)
+                except Exception:
+                    gid = None
+            thresholds = self.app.calibration_data.get("sensor_threshold")
+            try:
+                gesture_state = extract_gesture_state(vals, thresholds)
+            except Exception:
+                gesture_state = None
+            label_text = f"Gesto: {gesture_state}" if gesture_state is not None else None
+
+            # NOVO: atualiza imagem + lista de sensores + max amplitude
+            self.gesto_view.update_from_values(gid, vals, label_text=label_text)
+        except Exception:
+            pass
+
+        # Atualiza lista de sensores (visão compacta à direita)
         thresholds = self.app.calibration_data.get("sensor_threshold")
-        self.sensor_list.update_values(vals, thresholds=thresholds)
+        try:
+            self.sensor_list.update_values(vals, thresholds=thresholds)
+        except Exception:
+            pass
 
-        # ------------------------------------------------------------
-        # 2) Estado do gesto (processado)
-        # ------------------------------------------------------------
-        gesture = extract_gesture_state(vals, thresholds)
-        self.label_gesture.config(text=f"Gesto: {gesture}")
+        # Vetor e gráfico de frequência
+        try:
+            vec = compute_vector(vals)
+            if hasattr(self, "vector_viewer"):
+                self.vector_viewer.update_vector(vec)
+        except Exception:
+            pass
 
-        # ------------------------------------------------------------
-        # 3) Vetor 2D/3D
-        # ------------------------------------------------------------
-        vec = compute_vector(vals)
-        self.vector_viewer.update_vector(vec)
-
-        # ------------------------------------------------------------
-        # 4) Frequência
-        # ------------------------------------------------------------
-        self.freq_buffer.append(vals)
-        if len(self.freq_buffer) > 128:   # janela para FFT
-            self.freq_buffer.pop(0)
-
-        freq = compute_frequency(self.freq_buffer)
-        if freq is not None:
-            self.frequency_plot.update(freq)
+        try:
+            self.freq_buffer.append(vals)
+            if len(self.freq_buffer) > 128:
+                self.freq_buffer.pop(0)
+            freq = compute_frequency(self.freq_buffer)
+            if freq is not None and hasattr(self, "frequency_plot"):
+                self.frequency_plot.update(freq)
+        except Exception:
+            pass
 
     # ============================================================
     # FINALIZAÇÃO

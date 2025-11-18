@@ -18,6 +18,7 @@ class LEDIndicator(tk.Frame):
 
         # compatibilidade com versão antiga
         "ok": "green",
+        "conectado": "green",   # alias — compatibilidade com código que usa "conectado"
         "active": "yellow",
         "desconectado": "red",
         "erro": "orange",
