@@ -148,7 +148,7 @@ _DEFAULT_PORT = "COM3" if platform.system() == "Windows" else "/dev/ttyUSB0"
 # Detectar porta automaticamente ou usar padrão
 # Para forçar uma porta específica, passe como argumento:
 # GLOVE_CONNECTION_PORT = detect_glove_port("COM4")
-GLOVE_CONNECTION_PORT = detect_glove_port()
+GLOVE_CONNECTION_PORT = "USB0"
 
 # Configurações de comunicação serial (caso seja necessário no futuro)
 BAUD_RATE = 115200

@@ -15,6 +15,8 @@ import threading
 import tkinter as tk
 from tkinter import messagebox
 import logging
+import os
+from PIL import Image, ImageTk
 
 # Core
 from core.glove_thread import GloveReaderThread
@@ -60,6 +62,36 @@ class ClinicalGloveApp:
 
         # Processador de dados (filtro, parsing, etc.)
         self.processor = DataProcessor(sensor_count=len(SENSOR_NAMES))
+
+        # Número de sensores (usado pelas telas que constroem SensorList)
+        self.num_sensors = len(SENSOR_NAMES)
+        
+        # Dados de calibração iniciais (usado pelas telas)
+        self.calibration_data = {
+            "sensor_min": [0.0] * self.num_sensors,
+            "sensor_max": [0.0] * self.num_sensors,
+            "sensor_threshold": [0.5] * self.num_sensors
+        }
+
+        # Carregar imagens de gesto UMA VEZ e compartilhar com as telas
+        self.gesture_images = {}
+        try:
+            imgs_dir = os.path.join(os.getcwd(), "assets", "gesture-images")
+            if os.path.isdir(imgs_dir):
+                for fname in sorted(os.listdir(imgs_dir)):
+                    base, ext = os.path.splitext(fname)
+                    try:
+                        key = int(base)
+                    except Exception:
+                        continue
+                    path = os.path.join(imgs_dir, fname)
+                    try:
+                        img = Image.open(path).resize((320, 320), Image.Resampling.LANCZOS)
+                        self.gesture_images[key] = ImageTk.PhotoImage(img)
+                    except Exception:
+                        logger.exception("Falha ao carregar imagem %s", path)
+        except Exception:
+            logger.exception("Erro ao iniciar carregamento de imagens de gesto")
 
         # Tela ativa
         self.active_screen = None
@@ -286,39 +318,43 @@ class ClinicalGloveApp:
         if self._is_closing or not self._updates_running:
             return
 
+        status_updated = False
         try:
-            status_updated = False
-            
             while True:
                 status = self.status_queue.get_nowait()
+                # Diagnostics: print/log each dequeued status for debugging
+                print(f"[DEBUG] check_status: dequeued status -> {status!r}")
+                logger.debug("check_status: dequeued status -> %r", status)
                 status_updated = True
 
                 if status == "connected":
                     self.glove_connected = True
                     self._connection_attempts = 0  # Reset em caso de sucesso
                     logger.info("✓ Luva conectada")
+                    print("[DEBUG] glove_connected set to True")
 
                 elif status == "disconnected":
                     self.glove_connected = False
                     logger.warning("Luva desconectada")
+                    print("[DEBUG] glove_connected set to False (disconnected)")
 
-                elif status.startswith("error"):
+                elif isinstance(status, str) and status.startswith("error"):
                     self.glove_connected = False
                     self._handle_error(status)
+                    print(f"[DEBUG] check_status: handled error status -> {status}")
 
                 elif status == "stopped":
                     self.glove_connected = False
                     logger.info("Thread da luva parada")
 
-            # Atualiza UI apenas se houve mudança de status
+        except queue.Empty:
+            # Fila drenada -> atualizar UI se necessário
             if status_updated and hasattr(self.active_screen, "update_glove_status"):
                 try:
+                    print(f"[DEBUG] check_status: updating active_screen with glove_connected={self.glove_connected}")
                     self.active_screen.update_glove_status(self.glove_connected)
                 except Exception as e:
-                    logger.error(f"Erro ao atualizar status na tela: {e}")
-
-        except queue.Empty:
-            pass
+                    logger.error(f"Erro ao atualizar status na tela: {e}", exc_info=True)
         except Exception as e:
             logger.error(f"Erro no check_status: {e}", exc_info=True)
         finally:
@@ -372,45 +408,61 @@ class ClinicalGloveApp:
         if not self._is_closing:
             self.root.after(100, lambda: messagebox.showwarning(title, message))
 
-    # ============================================================
-    # PROCESSAMENTO DE DADOS
-    # ============================================================
     def check_data(self):
-        """
-        Lê pacotes de dados da luva, filtra ruído e envia para a tela ativa.
-        Processamento otimizado em lote.
-        """
+        """Lê pacotes de dados da fila e encaminha para a tela ativa."""
         if self._is_closing or not self._updates_running:
             return
 
         try:
             packets_processed = 0
-            max_packets_per_cycle = 10  # Limitar para não travar a UI
-            
+            max_packets_per_cycle = 10
+
             while packets_processed < max_packets_per_cycle:
                 raw = self.data_queue.get_nowait()
                 packets_processed += 1
 
-                # Parse do pacote
-                gesture_id, values = self.processor.parse_packet(raw, SENSOR_NAMES)
+                # Tentar parsear com o processor
+                gesture_id = None
+                values = None
+                try:
+                    # parse_packet pode aceitar (raw, sensor_names) ou só raw
+                    if hasattr(self.processor, "parse_packet"):
+                        try:
+                            parsed = self.processor.parse_packet(raw, SENSOR_NAMES)
+                        except TypeError:
+                            parsed = self.processor.parse_packet(raw)
 
-                if gesture_id is None or values is None:
-                    continue  # Pacote inválido
+                        if isinstance(parsed, tuple) and len(parsed) >= 2:
+                            gesture_id, values = parsed[0], parsed[1]
+                        elif isinstance(parsed, list):
+                            values = parsed
+                except Exception:
+                    logger.exception("Falha ao parsear pacote: %r", raw)
+                    continue
 
-                # Filtrar ruído
-                values = self.processor.clean_values(values)
+                if values is None:
+                    continue
 
-                # Enviar para tela ativa
+                # Filtrar / limpar valores se houver função
+                try:
+                    if hasattr(self.processor, "clean_values"):
+                        values = self.processor.clean_values(values)
+                except Exception:
+                    logger.exception("Falha ao limpar valores")
+
+                payload = (gesture_id, values)
+
+                # Encaminhar para a tela ativa (a tela aceita tupla ou string)
                 if hasattr(self.active_screen, "process_glove_data"):
                     try:
-                        self.active_screen.process_glove_data(gesture_id, values)
-                    except Exception as e:
-                        logger.error(f"Erro ao processar dados na tela: {e}")
+                        self.active_screen.process_glove_data(payload)
+                    except Exception:
+                        logger.exception("Erro em active_screen.process_glove_data")
 
         except queue.Empty:
             pass
-        except Exception as e:
-            logger.error(f"Erro no check_data: {e}", exc_info=True)
+        except Exception:
+            logger.exception("Erro no check_data")
         finally:
             if self._updates_running:
                 self.root.after(20, self.check_data)
