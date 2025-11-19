@@ -81,9 +81,6 @@ class VectorViewer(tk.Frame):
 
         self._draw_vector(px, py)
 
-    # ------------------------------------------------------------------
-    def _draw_vector(self, x, y):
-        """Desenha seta representando o vetor (já normalizado)."""
 
         self.canvas.delete("vector")
 
