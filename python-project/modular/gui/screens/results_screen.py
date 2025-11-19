@@ -1,7 +1,7 @@
 # gui/screens/results_screen.py
 
 import tkinter as tk
-from tkinter import ttk, messagebox
+from tkinter import ttk, messagebox, simpledialog
 import datetime
 
 
@@ -60,11 +60,11 @@ class ResultsScreen(tk.Frame):
         ).pack(side="left", padx=8)
 
         tk.Button(
-            btn_frame, text="Exportar Sessão",
+            btn_frame, text="Salvar Sessão",
             bg="#3B82F6", fg="white",
             font=("Helvetica", 12, "bold"),
             padx=20, pady=8,
-            command=self.export_session
+            command=self.save_session_dialog
         ).pack(side="left", padx=8)
 
         tk.Button(
@@ -97,11 +97,14 @@ class ResultsScreen(tk.Frame):
     # ============================================================
     # EXPORTAÇÃO
     # ============================================================
-    def export_session(self):
+    def save_session_dialog(self):
         """
-        Salva a sessão de calibração via state_manager.
+        Abre um diálogo modal listando pacientes já existentes (pastas em data/),
+        permitindo escolher um existente ou criar um novo usuário. Em seguida
+        salva o JSON da sessão dentro da pasta selecionada.
         """
         try:
+            # montar os dados da sessão a salvar
             session_data = {
                 "timestamp": datetime.datetime.now().isoformat(),
                 "sensor_min": self.results_data["sensor_min"],
@@ -111,17 +114,94 @@ class ResultsScreen(tk.Frame):
                 "mode": "calibration"
             }
 
-            # Dá suporte ao seu state_manager
-            if hasattr(self.app, "state_manager"):
-                path = self.app.state_manager.save_session(session_data)
-            else:
-                path = "data/sessions/calibration_export.json"
-                import json, os
-                os.makedirs("data/sessions", exist_ok=True)
-                with open(path, "w") as f:
-                    json.dump(session_data, f, indent=4)
+            # base data dir (usar state_manager se disponível)
+            base_dir = getattr(getattr(self.app, 'state_manager', None), 'base_dir', None)
+            if not base_dir:
+                base_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), 'data')
+            # ensure exists
+            os.makedirs(base_dir, exist_ok=True)
 
-            messagebox.showinfo("Exportação realizada", f"Sessão salva em:\n{path}")
+            # list patient folders (directories) inside base_dir
+            candidates = []
+            try:
+                for name in os.listdir(base_dir):
+                    p = os.path.join(base_dir, name)
+                    if os.path.isdir(p):
+                        candidates.append(name)
+            except Exception:
+                candidates = []
+
+            # modal dialog: simple Toplevel with Listbox + buttons
+            dlg = tk.Toplevel(self)
+            dlg.title("Salvar Sessão - Selecionar Paciente")
+            dlg.transient(self.winfo_toplevel())
+            dlg.grab_set()
+            tk.Label(dlg, text="Escolha paciente existente ou crie novo:", pady=8).pack()
+
+            listbox = tk.Listbox(dlg, height=8, width=40)
+            for c in candidates:
+                listbox.insert('end', c)
+            listbox.pack(padx=12, pady=6)
+
+            btn_row = tk.Frame(dlg)
+            btn_row.pack(pady=8)
+
+            def on_select():
+                sel = listbox.curselection()
+                if not sel:
+                    messagebox.showwarning("Selecionar", "Selecione um paciente ou crie novo usuário.")
+                    return
+                name = listbox.get(sel[0])
+                dlg.destroy()
+                save_to_patient(name)
+
+            def on_new():
+                dlg.withdraw()
+                name = simpledialog.askstring("Novo Usuário", "Nome do paciente (sem caracteres especiais):", parent=self)
+                dlg.deiconify()
+                if not name:
+                    return
+                # sanitize name (basic)
+                safe = "".join(c for c in name if c.isalnum() or c in (' ', '-', '_')).strip()
+                if not safe:
+                    messagebox.showerror("Erro", "Nome inválido para o paciente.")
+                    return
+                # create folder
+                patient_dir = os.path.join(base_dir, safe)
+                try:
+                    os.makedirs(patient_dir, exist_ok=True)
+                except Exception as e:
+                    messagebox.showerror("Erro", f"Não foi possível criar pasta do paciente:\n{e}")
+                    return
+                dlg.destroy()
+                save_to_patient(safe)
+
+            def on_cancel():
+                dlg.destroy()
+
+            tk.Button(btn_row, text="Selecionar", command=on_select, bg="#3B82F6", fg="white").pack(side="left", padx=6)
+            tk.Button(btn_row, text="Novo Usuário", command=on_new, bg="#10B981", fg="white").pack(side="left", padx=6)
+            tk.Button(btn_row, text="Cancelar", command=on_cancel, bg="#6B7280", fg="white").pack(side="left", padx=6)
+
+            def save_to_patient(patient_name):
+                try:
+                    patient_dir = os.path.join(base_dir, patient_name)
+                    os.makedirs(patient_dir, exist_ok=True)
+                    # filename: timestamp.json
+                    fname = datetime.datetime.now().strftime("%Y%m%d_%H%M%S") + ".json"
+                    path = os.path.join(patient_dir, fname)
+                    import json
+                    with open(path, "w", encoding="utf-8") as fp:
+                        json.dump(session_data, fp, indent=4, ensure_ascii=False)
+
+                    messagebox.showinfo("Sessão salva", f"Sessão salva em:\n{path}")
+                except Exception as e:
+                    messagebox.showerror("Erro", f"Falha ao salvar sessão:\n{e}")
+
+            # center dialog
+            self.update_idletasks()
+            dlg.geometry(f"+{self.winfo_rootx()+50}+{self.winfo_rooty()+50}")
+            dlg.wait_window()
 
         except Exception as e:
-            messagebox.showerror("Erro", f"Falha ao exportar sessão:\n{e}")
+            messagebox.showerror("Erro", f"Falha ao salvar sessão:\n{e}")

@@ -116,17 +116,16 @@ else:
     _DEFAULT_PORT = "/dev/ttyUSB0"
     GLOVE_CONNECTION_PORT = detect_glove_port()
 
-<<<<<<< HEAD
+    
 # Configurações de comunicação serial (não usadas pela 5DT,
 # mas deixadas para compatibilidade)
-=======
+
 # Detectar porta automaticamente ou usar padrão
 # Para forçar uma porta específica, passe como argumento:
 # GLOVE_CONNECTION_PORT = detect_glove_port("COM4")
 GLOVE_CONNECTION_PORT = "USB0"
 
-# Configurações de comunicação serial (caso seja necessário no futuro)
->>>>>>> 49b923577e0deeb0c5c99073b8b4c341bb357f36
+
 BAUD_RATE = 115200
 SERIAL_TIMEOUT = 0.05
 

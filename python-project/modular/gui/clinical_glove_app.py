@@ -321,6 +321,7 @@ class ClinicalGloveApp:
             return
 
         status_updated = False
+        last_status = None
         try:
             while True:
                 status = self.status_queue.get_nowait()
@@ -349,17 +350,23 @@ class ClinicalGloveApp:
                     self.glove_connected = False
                     logger.info("Thread da luva parada")
 
+                # remember last status dequeued for potential fallback
+                last_status = status
+
         except queue.Empty:
             # Fila drenada -> atualizar UI se necessário
             if status_updated and hasattr(self.active_screen, "update_glove_status"):
                 try:
-<<<<<<< HEAD
-                    # Passar o status original da fila
-                    self.active_screen.update_glove_status(status)
-=======
+                    # Preferir informar o estado booleano (mais comum nas telas).
+                    # Se a tela esperar a string original, tentamos fallback.
                     print(f"[DEBUG] check_status: updating active_screen with glove_connected={self.glove_connected}")
                     self.active_screen.update_glove_status(self.glove_connected)
->>>>>>> 49b923577e0deeb0c5c99073b8b4c341bb357f36
+                except TypeError:
+                    try:
+                        logger.debug("update_glove_status rejected boolean, falling back to last_status=%r", last_status)
+                        self.active_screen.update_glove_status(last_status)
+                    except Exception as e:
+                        logger.error(f"Erro ao atualizar status na tela (fallback): {e}", exc_info=True)
                 except Exception as e:
                     logger.error(f"Erro ao atualizar status na tela: {e}", exc_info=True)
         except Exception as e:

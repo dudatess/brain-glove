@@ -77,16 +77,10 @@ class MainScreen(tk.Frame):
             bg="#6366F1", fg="white",
             padx=30, pady=12,
             width=20,
-            command=lambda: self.app.show_results_screen(results_data=None)
+            command=self.app.show_history_screen
         )
         history_btn.grid(row=2, column=0, pady=10)
-        tk.Button(
-            self,
-            text="Histórico",
-            bg="#6B7280", fg="white",
-            font=("Helvetica", 14, "bold"),
-            command=self.app.show_history_screen
-        ).pack(pady=10)
+        
 
 
         # ======================================
@@ -104,7 +98,7 @@ class MainScreen(tk.Frame):
     # ======================================
     # MÉTODO CHAMADO PELO APP
     # ======================================
-<<<<<<< HEAD
+
     def update_glove_status(self, status: str):
         status = status.strip().lower()
 
@@ -114,13 +108,13 @@ class MainScreen(tk.Frame):
             self.led.set_state("active")
         elif status.startswith("error"):
             self.led.set_state("erro")
-=======
+
     def update_glove_status(self, connected: bool):
         """Atualiza o LED conforme o status da conexão."""
         # usar estados compatíveis com LEDIndicator (usar "ok" para conectado)
         if connected:
             self.led.set_state("ok")
->>>>>>> 49b923577e0deeb0c5c99073b8b4c341bb357f36
+
         else:
             self.led.set_state("desconectado")
 
